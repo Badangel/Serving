@@ -5,11 +5,23 @@ if (NOT EXISTS
                 --output-document
                 ${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid/text_classification_lstm.tar.gz)
 
-            execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf
                 "${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid/text_classification_lstm.tar.gz"
                 WORKING_DIRECTORY
                 ${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid
                 )
+endif()
+
+if (NOT EXISTS
+                ${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid/ctr_prediction)
+        execute_process(COMMAND wget --no-check-certificate
+                https://paddle-serving.bj.bcebos.com/data/ctr_prediction/ctr_prediction.tar.gz
+                --output-document
+                ${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid/ctr_prediction.tar.gz)
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xzf
+                "${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid/ctr_prediction.tar.gz"
+                WORKING_DIRECTORY
+                ${CMAKE_CURRENT_LIST_DIR}/data/model/paddle/fluid)
 endif()
 
 include_directories(SYSTEM  ${CMAKE_CURRENT_LIST_DIR}/../kvdb/include)
@@ -18,7 +30,7 @@ include(op/CMakeLists.txt)
 include(proto/CMakeLists.txt)
 add_executable(serving ${serving_srcs})
 add_dependencies(serving pdcodegen fluid_cpu_engine pdserving paddle_fluid
-        opencv_imgcodecs)
+        opencv_imgcodecs cube-api)
 if (WITH_GPU)
     add_dependencies(serving fluid_gpu_engine)
 endif()
@@ -40,6 +52,7 @@ target_link_libraries(serving opencv_imgcodecs
         ${opencv_depend_libs})
 
 target_link_libraries(serving pdserving)
+target_link_libraries(serving cube-api)
 
 target_link_libraries(serving kvdb rocksdb)
 
