@@ -93,7 +93,11 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 if(NOT APPLE)
   find_package(Threads REQUIRED)
   link_libraries(${CMAKE_THREAD_LIBS_INIT})
-  set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} -pthread -ldl -lrt")
+  if(WITH_LITE OR WITH_XPU)
+    set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} -fopenmp -pthread -ldl -lrt")
+  else()
+    set(CMAKE_CXX_LINK_EXECUTABLE "${CMAKE_CXX_LINK_EXECUTABLE} -pthread -ldl -lrt")
+  endif()
 endif(NOT APPLE)
 
 set_property(GLOBAL PROPERTY FLUID_MODULES "")
@@ -704,6 +708,15 @@ function(py_proto_compile TARGET_NAME)
   add_custom_target(${TARGET_NAME} ALL DEPENDS ${py_srcs})
 endfunction()
 
+function(py_grpc_proto_compile TARGET_NAME)
+  set(oneValueArgs "")
+  set(multiValueArgs SRCS)
+  cmake_parse_arguments(py_grpc_proto_compile "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+  set(py_srcs)
+  grpc_protobuf_generate_python(py_srcs ${py_grpc_proto_compile_SRCS})
+  add_custom_target(${TARGET_NAME} ALL DEPENDS ${py_srcs})
+endfunction()
+
 function(py_test TARGET_NAME)
   if(WITH_TESTING)
     set(options "")
@@ -832,17 +845,18 @@ function(PROTOBUF_GENERATE_SERVING_CPP FOR_SERVING_SIDE SRCS HDRS )
     list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.cc")
     list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.h")
 
+    set(PDCODEGEN "${CMAKE_BINARY_DIR}/core/pdcodegen/pdcodegen")
     if (${FOR_SERVING_SIDE})
         add_custom_command(
             OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.cc"
                    "${CMAKE_CURRENT_BINARY_DIR}/${FIL_WE}.pb.h"
             COMMAND  ${Protobuf_PROTOC_EXECUTABLE}
                 ARGS --cpp_out=${CMAKE_CURRENT_BINARY_DIR}
-                --pdcodegen_out=${CMAKE_CURRENT_BINARY_DIR}
-                --plugin=protoc-gen-pdcodegen=${CMAKE_BINARY_DIR}/pdcodegen/pdcodegen
-                --proto_path=${CMAKE_SOURCE_DIR}/predictor/proto
+                --pdcodegen_out=${CMAKE_CURRENT_BINARY_DIR}/core
+                --plugin=protoc-gen-pdcodegen=${CMAKE_BINARY_DIR}/core/pdcodegen/pdcodegen
+                --proto_path=${CMAKE_SOURCE_DIR}/core/predictor/proto
                 ${_protobuf_include_path} ${ABS_FIL}
-            DEPENDS ${ABS_FIL} ${Protobuf_PROTOC_EXECUTABLE}
+            DEPENDS ${ABS_FIL} ${Protobuf_PROTOC_EXECUTABLE} ${PDCODEGEN}
             COMMENT "Running Paddle-serving C++ protocol buffer compiler on ${FIL}"
             VERBATIM)
     else()
@@ -854,7 +868,7 @@ function(PROTOBUF_GENERATE_SERVING_CPP FOR_SERVING_SIDE SRCS HDRS )
                 --pdcodegen_out=${CMAKE_CURRENT_BINARY_DIR}
                 --plugin=protoc-gen-pdcodegen=${CMAKE_BINARY_DIR}/pdcodegen/pdcodegen
                 ${_protobuf_include_path} ${ABS_FIL}
-            DEPENDS ${ABS_FIL} ${Protobuf_PROTOC_EXECUTABLE}
+            DEPENDS ${ABS_FIL} ${Protobuf_PROTOC_EXECUTABLE} ${PDCODEGEN}
             COMMENT "Running Paddle-serving C++ protocol buffer compiler on ${FIL}"
             VERBATIM)
     endif()
